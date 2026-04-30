@@ -5,14 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>暂停实验室 · 5 万粉啦</title>
 
-  <!-- 思源黑体 (Noto Sans SC) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <!-- 字体方案:直接用系统自带中文字体,无需联网下载 -->
+  <!-- iOS: 苹方 / Android: 鸿蒙黑体或思源黑体 / Windows: 微软雅黑 -->
+  <!-- 视觉风格高度接近思源黑体,且加载即用,国内零延迟 -->
 
-  <!-- 物理引擎 + 动画库 -->
-  <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <!-- 物理引擎 + 动画库 (BootCDN 国内 CDN,无需 VPN) -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
   <style>
     /* ============================================================
@@ -24,7 +23,7 @@
       height: 100%;
       overflow: hidden;
       background: #2a2a2a;
-      font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
       -webkit-tap-highlight-color: transparent;
       touch-action: none;
     }
@@ -60,14 +59,14 @@
       top: 0;
       left: 0;
       right: 0;
-      padding: calc(16px + env(safe-area-inset-top)) 24px 0;
+      padding: 16px 24px 0;
       z-index: 10;
       pointer-events: none;
     }
     /* 顶部刷新按钮 (右上角) */
     #refresh-btn {
       position: absolute;
-      top: calc(14px + env(safe-area-inset-top));
+      top: 14px;
       right: 18px;
       width: 36px;
       height: 36px;
@@ -85,7 +84,7 @@
 
     /* 主标题 */
     .title {
-      font-family: "Noto Sans SC", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
       font-weight: 700;
       color: #7C6100;
       /* 响应式字号:小屏 28px → 屏幕宽度 9% → 大屏 42px 封顶 */
@@ -99,7 +98,7 @@
 
     /* 副标题 */
     .subtitle {
-      font-family: "Noto Sans SC", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
       font-weight: 500;
       color: #7C6100;
       /* 响应式字号:小屏 16px → 屏幕宽度 4.8% → 大屏 22px 封顶 */
@@ -184,7 +183,7 @@
        ============================================================ */
     #cta {
       position: absolute;
-      bottom: calc(clamp(20px, 7vw, 28px) + env(safe-area-inset-bottom));
+      bottom: clamp(20px, 7vw, 28px);
       left: 50%;
       transform: translateX(-50%);
       background: #ad8a23;
@@ -197,7 +196,6 @@
       z-index: 20;
       pointer-events: none;
       box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
-      white-space: nowrap;
     }
 
     /* ============================================================
