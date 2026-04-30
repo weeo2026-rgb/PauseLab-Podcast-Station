@@ -60,14 +60,14 @@
       top: 0;
       left: 0;
       right: 0;
-      padding: 16px 24px 0;
+      padding: calc(16px + env(safe-area-inset-top)) 24px 0;
       z-index: 10;
       pointer-events: none;
     }
     /* 顶部刷新按钮 (右上角) */
     #refresh-btn {
       position: absolute;
-      top: 14px;
+      top: calc(14px + env(safe-area-inset-top));
       right: 18px;
       width: 36px;
       height: 36px;
@@ -184,7 +184,7 @@
        ============================================================ */
     #cta {
       position: absolute;
-      bottom: clamp(20px, 7vw, 28px);
+      bottom: calc(clamp(20px, 7vw, 28px) + env(safe-area-inset-bottom));
       left: 50%;
       transform: translateX(-50%);
       background: #ad8a23;
@@ -197,6 +197,7 @@
       z-index: 20;
       pointer-events: none;
       box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+      white-space: nowrap;
     }
 
     /* ============================================================
