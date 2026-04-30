@@ -86,12 +86,14 @@
     /* 主标题 */
     .title {
       font-family: "Noto Sans SC", sans-serif;
-      font-weight: 700;            /* 900 → 700,降低字重让画面透气 */
+      font-weight: 700;
       color: #7C6100;
-      font-size: 42px;
-      line-height: 1.35;           /* 1.25 → 1.35,行内空气感 */
-      letter-spacing: 0;           /* 去掉负字距 */
-      margin-top: 56px;
+      /* 响应式字号:小屏 28px → 屏幕宽度 9% → 大屏 42px 封顶 */
+      font-size: clamp(28px, 9vw, 42px);
+      line-height: 1.35;
+      letter-spacing: 0;
+      /* 顶部间距也响应式 */
+      margin-top: clamp(40px, 11vw, 56px);
       text-align: center;
     }
 
@@ -99,24 +101,29 @@
     .subtitle {
       font-family: "Noto Sans SC", sans-serif;
       font-weight: 500;
-      color: #7C6100;              /* 修改后的字色 */
-      font-size: 22px;             /* 17 → 22 */
+      color: #7C6100;
+      /* 响应式字号:小屏 16px → 屏幕宽度 4.8% → 大屏 22px 封顶 */
+      font-size: clamp(16px, 4.8vw, 22px);
       text-align: center;
-      margin-top: 12px;
+      margin-top: clamp(8px, 2.4vw, 12px);
       opacity: 0.85;
     }
 
     /* 白色留言框 */
     .message-box {
-      margin: 18px auto 0;
+      /* 响应式外边距 */
+      margin: clamp(12px, 4vw, 18px) auto 0;
       width: calc(100% - 8px);
       background: #fff;
-      border-radius: 18px;
+      /* 响应式圆角和边框 */
+      border-radius: clamp(14px, 4vw, 18px);
       border: 2px solid #c9a44a;
-      padding: 26px 18px;
+      /* 响应式内边距 */
+      padding: clamp(18px, 6vw, 26px) clamp(14px, 4vw, 18px);
       text-align: center;
       line-height: 1.6;
-      min-height: 110px;          /* 高度固定,文案变化时不抖动 */
+      /* 响应式最小高度,文案变化时不抖动 */
+      min-height: clamp(80px, 24vw, 110px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -124,17 +131,17 @@
     /* 占位文本(没人点元素时显示) */
     #message-default {
       color: #c9bfa8;
-      font-size: 17px;
+      font-size: clamp(13px, 4vw, 17px);
       font-weight: 500;
     }
     /* 正文文本(点击元素后填充) */
     #message-content {
-      display: none;              /* 默认隐藏,有内容时切换 */
-      color: #7C6100;             /* 深棕色,正文阅读色 */
-      font-size: 22px;            /* 比占位略大 */
-      font-weight: 500;           /* Medium */
+      display: none;
+      color: #7C6100;
+      /* 响应式字号:小屏 16px → 屏幕宽度 5.5% → 大屏 22px */
+      font-size: clamp(16px, 5.5vw, 22px);
+      font-weight: 500;
     }
-    /* 当有内容时,隐藏占位,显示正文 */
     .message-box.has-content #message-default { display: none; }
     .message-box.has-content #message-content { display: block; }
 
@@ -177,18 +184,18 @@
        ============================================================ */
     #cta {
       position: absolute;
-      bottom: 28px;
+      bottom: clamp(20px, 7vw, 28px);
       left: 50%;
       transform: translateX(-50%);
       background: #ad8a23;
       color: #fff;
-      padding: 14px 64px;
-      border-radius: 14px;
+      padding: clamp(11px, 3.5vw, 14px) clamp(48px, 16vw, 64px);
+      border-radius: clamp(11px, 3.5vw, 14px);
       font-weight: 700;
-      font-size: 18px;
+      font-size: clamp(15px, 4.5vw, 18px);
       letter-spacing: 2px;
       z-index: 20;
-      pointer-events: none;       /* 本期占位,不可点 */
+      pointer-events: none;
       box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
     }
 
