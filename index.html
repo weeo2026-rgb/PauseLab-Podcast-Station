@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>暂停实验室 · 5 万粉啦</title>
+
+  <!-- 思源黑体 (Noto Sans SC) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- 物理引擎 + 动画库 -->
+  <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+  <style>
+    /* ============================================================
+       全局基础
+       ============================================================ */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #2a2a2a;
+      font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+    }
+
+    /* ============================================================
+       海报舞台 —— 模拟手机屏幕
+       ============================================================ */
+    #stage {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100vw;
+      height: 100vh;
+      max-width: 500px;
+      background: #FFE770;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    @media (min-width: 501px) {
+      #stage {
+        height: 95vh;
+        max-height: 980px;
+        border-radius: 36px;
+      }
+    }
+
+    /* ============================================================
+       上半屏 文案区(静态展示,不参与物理交互)
+       ============================================================ */
+    #header-area {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 16px 24px 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+    /* 顶部刷新按钮 (右上角) */
+    #refresh-btn {
+      position: absolute;
+      top: 14px;
+      right: 18px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    #refresh-btn:hover { opacity: 1; }
+    #refresh-btn:active { transform: scale(0.85); }
+    #refresh-btn svg { width: 24px; height: 24px; }
+
+    /* 主标题 */
+    .title {
+      font-family: "Noto Sans SC", sans-serif;
+      font-weight: 700;            /* 900 → 700,降低字重让画面透气 */
+      color: #7C6100;
+      font-size: 42px;
+      line-height: 1.35;           /* 1.25 → 1.35,行内空气感 */
+      letter-spacing: 0;           /* 去掉负字距 */
+      margin-top: 56px;
+      text-align: center;
+    }
+
+    /* 副标题 */
+    .subtitle {
+      font-family: "Noto Sans SC", sans-serif;
+      font-weight: 500;
+      color: #7C6100;              /* 修改后的字色 */
+      font-size: 22px;             /* 17 → 22 */
+      text-align: center;
+      margin-top: 12px;
+      opacity: 0.85;
+    }
+
+    /* 白色留言框 */
+    .message-box {
+      margin: 18px auto 0;
+      width: calc(100% - 8px);
+      background: #fff;
+      border-radius: 18px;
+      border: 2px solid #c9a44a;
+      padding: 26px 18px;
+      text-align: center;
+      line-height: 1.6;
+      min-height: 110px;          /* 高度固定,文案变化时不抖动 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* 占位文本(没人点元素时显示) */
+    #message-default {
+      color: #c9bfa8;
+      font-size: 17px;
+      font-weight: 500;
+    }
+    /* 正文文本(点击元素后填充) */
+    #message-content {
+      display: none;              /* 默认隐藏,有内容时切换 */
+      color: #7C6100;             /* 深棕色,正文阅读色 */
+      font-size: 22px;            /* 比占位略大 */
+      font-weight: 500;           /* Medium */
+    }
+    /* 当有内容时,隐藏占位,显示正文 */
+    .message-box.has-content #message-default { display: none; }
+    .message-box.has-content #message-content { display: block; }
+
+    /* ============================================================
+       下半屏 物理交互区
+       ============================================================ */
+    #playground {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      /* top 由 JS 动态设置(=文案区底部位置) */
+    }
+
+    /* ============================================================
+       物理元素通用样式
+       ============================================================ */
+    .element {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: auto;
+      will-change: transform;
+      user-select: none;
+      -webkit-user-drag: none;
+      cursor: pointer;
+      transform-origin: center center;
+    }
+    .element img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    /* ============================================================
+       底部 CTA 按钮(本期占位,不可点)
+       ============================================================ */
+    #cta {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ad8a23;
+      color: #fff;
+      padding: 14px 64px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 2px;
+      z-index: 20;
+      pointer-events: none;       /* 本期占位,不可点 */
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+    }
+
+    /* ============================================================
+       iOS 陀螺仪授权按钮
+       ============================================================ */
+    #motion-permission {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      background: #00A0FF;
+      color: white;
+      border: none;
+      border-radius: 22px;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0, 160, 255, 0.4);
+      z-index: 100;
+      display: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="stage">
+
+  <!-- ============================================================
+       上半屏:文案区
+       ============================================================ -->
+  <div id="header-area">
+    <!-- 刷新按钮 (本期不接交互,后面会重置元素位置) -->
+    <div id="refresh-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#4a3a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/>
+        <path d="M21 3v5h-5"/>
+      </svg>
+    </div>
+
+    <h1 class="title">暂停实验播客5万粉啦</h1>
+    <p class="subtitle">点击任意元素试试看</p>
+    <div class="message-box" id="message-box">
+      <span id="message-default">想听我们聊什么主题<br/>可以点击下方传送门留言哦!</span>
+      <span id="message-content"></span>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       下半屏:物理交互区(20 个贴纸元素)
+       ============================================================ -->
+  <div id="playground">
+    <!-- 主角:猫(默认卡通猫,点击切换真猫) -->
+    <div class="element" data-id="cat" data-shape="rect" data-size="cat">
+      <img src="assets/cat-cartoon.png" draggable="false" />
+    </div>
+
+    <!-- 4 个人头(次大,围绕猫) -->
+    <div class="element" data-id="head-tt" data-shape="circle" data-size="head"><img src="assets/head-tt.png" draggable="false" /></div>
+    <div class="element" data-id="head-dd" data-shape="circle" data-size="head"><img src="assets/head-dd.png" draggable="false" /></div>
+    <div class="element" data-id="head-zz" data-shape="circle" data-size="head"><img src="assets/head-zz.png" draggable="false" /></div>
+    <div class="element" data-id="head-ss" data-shape="circle" data-size="head"><img src="assets/head-ss.png" draggable="false" /></div>
+
+    <!-- 中等元素:logo、文字标签 -->
+    <div class="element" data-id="logo" data-shape="circle" data-size="medium"><img src="assets/logo.png" draggable="false" /></div>
+    <div class="element" data-id="text-zanting" data-shape="rect" data-size="medium"><img src="assets/text-zanting.png" draggable="false" /></div>
+    <div class="element" data-id="text-subscribed" data-shape="rect" data-size="medium"><img src="assets/text-subscribed.png" draggable="false" /></div>
+    <div class="element" data-id="text-mouth" data-shape="rect" data-size="medium"><img src="assets/text-mouth.png" draggable="false" /></div>
+    <div class="element" data-id="headphone" data-shape="rect" data-size="medium"><img src="assets/headphone.png" draggable="false" /></div>
+
+    <!-- 小道具(12 个) -->
+    <div class="element" data-id="mic" data-shape="rect" data-size="small"><img src="assets/mic.png" draggable="false" /></div>
+    <div class="element" data-id="excl" data-shape="rect" data-size="small"><img src="assets/excl.png" draggable="false" /></div>
+    <div class="element" data-id="leaf-green" data-shape="rect" data-size="small"><img src="assets/leaf-green.png" draggable="false" /></div>
+    <div class="element" data-id="leaf-orange" data-shape="rect" data-size="small"><img src="assets/leaf-orange.png" draggable="false" /></div>
+    <div class="element" data-id="paw" data-shape="circle" data-size="small"><img src="assets/paw.png" draggable="false" /></div>
+    <div class="element" data-id="fish" data-shape="rect" data-size="small"><img src="assets/fish.png" draggable="false" /></div>
+    <div class="element" data-id="question" data-shape="rect" data-size="small"><img src="assets/question.png" draggable="false" /></div>
+    <div class="element" data-id="arrow" data-shape="rect" data-size="small"><img src="assets/arrow.png" draggable="false" /></div>
+    <div class="element" data-id="planet" data-shape="circle" data-size="small"><img src="assets/planet.png" draggable="false" /></div>
+    <div class="element" data-id="cloud-pink" data-shape="rect" data-size="small"><img src="assets/cloud-pink.png" draggable="false" /></div>
+    <div class="element" data-id="eye" data-shape="rect" data-size="small"><img src="assets/eye.png" draggable="false" /></div>
+    <div class="element" data-id="confused" data-shape="rect" data-size="small"><img src="assets/confused.png" draggable="false" /></div>
+  </div>
+
+  <!-- 底部 CTA -->
+  <div id="cta">投稿传送门</div>
+</div>
+
+<button id="motion-permission">点击开启体感互动 📱</button>
+
+<script>
+/* ============================================================
+   ⚙️ 全局配置 —— 想调效果改这里
+   ============================================================ */
+const CONFIG = {
+  // —— 物理世界(弱重力,让元素更"漂浮"而不是"砸下去") ——
+  GRAVITY_Y: 0.15,                // 弱重力(原 0.5)
+  WALL_THICKNESS: 200,
+  RESTITUTION: 0.7,
+  FRICTION: 0.04,
+  FRICTION_AIR: 0.04,             // 空气阻力大点,让运动很快稳定
+  DENSITY: 0.001,
+
+  // —— 元素相对尺寸(占舞台宽度的比例) ——
+  // 大小层级:cat 最大 → head 次大 → medium → small
+  SIZE: {
+    cat: 0.62,
+    head: 0.22,
+    medium: 0.18,
+    small: 0.14,
+  },
+
+  // —— 交互力度 ——
+  TAP_IMPULSE: 0.025,             // 点击元素自身的冲量(自己跳起来)
+  CAT_EXPLOSION_FORCE: 0.05,      // 点猫时,周围元素被推开的力(切换猫触发)
+  TAP_EXPLOSION_FORCE: 0.10,      // 点普通元素时,周围元素被推开的力(猫的 2 倍)
+  TAP_EXPLOSION_RADIUS: 0.55,     // 推力影响半径(占舞台宽度的比例),超过这个距离不受力
+  SHAKE_FORCE: 0.02,
+  SHAKE_THRESHOLD: 14,
+
+  // —— 元素之间的"空气墙" ——
+  // 物理碰撞体比图片大多少(1.0=不留间距,1.15=外扩 15%)
+  COLLISION_PADDING: 1.12,
+
+  // —— 震动反馈(仅 Android Chrome) ——
+  VIBRATE_TAP: 12,
+  VIBRATE_CAT_SWITCH: [20, 40, 30],
+
+  // —— 进入动画 ——
+  ENTER_STAGGER: 0.03,
+};
+
+/* ============================================================
+   📝 文案库 —— 想改文案直接编辑这个对象就行
+   规则:
+   - 数组里每条文案 = 点击该元素时可能显示的内容
+   - 没列在这里的元素 = 点击只触发动画,不显示文案
+   - 真猫和卡通猫共用 'cat' 这一组
+   - 单条文案换行用 \n
+   ============================================================ */
+const MESSAGES = {
+  cat: [
+    "喵嗷",
+    "Miao",
+    ">w<",
+    "这是冯老师,暂停实验室顶流(旁白)",
+    "喵喵喵喵喵嗷!",
+    "喵？（今日练习搞定了吗？）"
+  ],
+  'head-tt': [
+    "不要错过这么宝藏的播客!",
+    "我是常驻主播郭婷婷",
+    "占位文案"
+  ],
+  'head-dd': [
+    "当大家的「嘴替」,负责帮你说出你不好意思说的话",
+    "你皱眉的样子,我都收到了",
+    "夜深人静该听我们的播客🌛"
+  ],
+  'head-zz': [
+    "我是果苗,头上的草是我的灵感",
+    "不会写程序员的播客剪辑的不是好果苗。",
+    "今天你暂停了吗"
+  ],
+  'head-ss': [
+    "我是常驻主播王偲偲",
+    "我们认真地聊些不正经的话题",
+    "也不正经地聊些认真的话题"
+  ],
+  logo: [
+    "Pause, think and self-care",
+    "我是暂停实验室的 logo"
+  ],
+  'text-zanting': [
+    "各大平台搜「暂停实验」即可收听",
+    "别忘了关注，更新之后喊你们！",
+    "一起来大脑健身吧!!"
+  ],
+  'text-subscribed': [
+    "5 万粉了，欢迎更多人来收听!",
+    "这个播客达成的效果,是「自我解放」"
+  ],
+  'text-mouth': [
+    "这是真的",
+    "评论区老听众认证",
+    "谁说出了你的心声?"
+  ],
+  headphone: [
+    "55 期,涵盖从情绪、职场、运动、\n到人际沟通各种话题。",
+    "你可以在「播客主页-内容专题」里看到详细分类。",
+    "心理学界最顶播客(愿望)"
+  ],
+  mic: [
+    "评论区总是特别热闹,快来掺和一下叭。",
+    "你也可以在这里,找到共鸣！"
+  ],
+};
+
+/* 每个元素维护"上一次显示的索引",用于实现"随机不重复" */
+const lastShownIndex = {};
+
+/* 留言框 DOM 引用 */
+const messageBox = document.getElementById('message-box');
+const messageContent = document.getElementById('message-content');
+
+/* 显示某个元素对应的文案(随机不重复) */
+function showMessage(elementId) {
+  const pool = MESSAGES[elementId];
+  if (!pool || pool.length === 0) return;   // 没文案的元素直接退出
+
+  let idx;
+  if (pool.length === 1) {
+    idx = 0;                                  // 只有一条直接用
+  } else {
+    // 随机不重复:在"除了上次那条"的剩余里选
+    const last = lastShownIndex[elementId];
+    const candidates = pool
+      .map((_, i) => i)
+      .filter(i => i !== last);
+    idx = candidates[Math.floor(Math.random() * candidates.length)];
+  }
+  lastShownIndex[elementId] = idx;
+
+  // 渲染文案(支持 \n 换行)
+  messageContent.innerHTML = pool[idx].replace(/\n/g, '<br/>');
+  messageBox.classList.add('has-content');
+}
+
+/* ============================================================
+   1. 等文案区渲染完,确定下半屏(playground)的高度
+   ============================================================ */
+const stage = document.getElementById('stage');
+const headerArea = document.getElementById('header-area');
+const playground = document.getElementById('playground');
+const cta = document.getElementById('cta');
+
+let pgW, pgH, pgTop;   // playground 的尺寸和顶部偏移
+
+function measurePlayground() {
+  const stageH = stage.clientHeight;
+  const stageW = stage.clientWidth;
+  // 文案区底部 = playground 顶部
+  const headerBottom = headerArea.getBoundingClientRect().bottom - stage.getBoundingClientRect().top;
+  // CTA 顶部 = playground 底部
+  const ctaTop = cta.offsetTop;
+
+  pgTop = headerBottom + 6;        // 留一点点呼吸距离
+  pgW = stageW;
+  pgH = ctaTop - pgTop - 6;
+
+  playground.style.top = pgTop + 'px';
+  playground.style.height = pgH + 'px';
+}
+
+/* ============================================================
+   2. 初始化物理引擎
+   ============================================================ */
+const { Engine, Bodies, Body, Composite } = Matter;
+const engine = Engine.create();
+engine.gravity.y = CONFIG.GRAVITY_Y;
+
+let walls = [];
+function buildWalls() {
+  walls.forEach(w => Composite.remove(engine.world, w));
+  const t = CONFIG.WALL_THICKNESS;
+  walls = [
+    Bodies.rectangle(pgW / 2, -t / 2, pgW + t * 2, t, { isStatic: true }),         // 顶(=文案区底)
+    Bodies.rectangle(pgW / 2, pgH + t / 2, pgW + t * 2, t, { isStatic: true }),    // 底
+    Bodies.rectangle(-t / 2, pgH / 2, t, pgH + t * 2, { isStatic: true }),         // 左
+    Bodies.rectangle(pgW + t / 2, pgH / 2, t, pgH + t * 2, { isStatic: true }),    // 右
+  ];
+  Composite.add(engine.world, walls);
+}
+
+/* ============================================================
+   3. 创建物理元素
+   ============================================================ */
+const items = [];
+
+function commonOpts(extra = {}) {
+  return {
+    restitution: CONFIG.RESTITUTION,
+    friction: CONFIG.FRICTION,
+    frictionAir: CONFIG.FRICTION_AIR,
+    density: CONFIG.DENSITY,
+    ...extra,
+  };
+}
+
+function createItem(dom, x, y) {
+  const sizeKey = dom.dataset.size;
+  const shape = dom.dataset.shape;
+  const img = dom.querySelector('img');
+
+  const targetW = pgW * CONFIG.SIZE[sizeKey];
+  const ratio = img.naturalHeight / img.naturalWidth;
+  const targetH = targetW * ratio;
+
+  dom.style.width = targetW + 'px';
+  dom.style.height = targetH + 'px';
+
+  // 物理碰撞体加上 "空气墙" padding —— 比视觉上更大一圈,实现元素间不重叠
+  const pad = CONFIG.COLLISION_PADDING;
+
+  let body;
+  if (shape === 'circle') {
+    const r = Math.min(targetW, targetH) / 2 * 0.85 * pad;
+    body = Bodies.circle(x, y, r, commonOpts());
+  } else {
+    body = Bodies.rectangle(x, y, targetW * 0.78 * pad, targetH * 0.82 * pad,
+      commonOpts({ chamfer: { radius: Math.min(targetW, targetH) * 0.15 } }));
+  }
+  Composite.add(engine.world, body);
+  // 记录初始位置和角度,用于"重置"功能
+  const item = { dom, body, w: targetW, h: targetH, sizeKey, shape,
+                 initX: x, initY: y };
+  items.push(item);
+  return item;
+}
+
+/* ============================================================
+   4. 等图片加载完成后,统一布局
+   ============================================================ */
+function whenAllImagesLoaded(callback) {
+  const imgs = document.querySelectorAll('.element img');
+  let loaded = 0;
+  const done = () => { if (++loaded === imgs.length) callback(); };
+  imgs.forEach(img => {
+    if (img.complete && img.naturalWidth > 0) done();
+    else {
+      img.addEventListener('load', done);
+      img.addEventListener('error', done);
+    }
+  });
+}
+
+/* ----- 关键:布局算法 - 椭圆双环绕分布(参考图样式) ----- */
+function layout() {
+  const W = pgW, H = pgH;
+  const cx = W / 2, cy = H / 2;
+
+  // 主角猫:中心
+  const catDom = document.querySelector('[data-id="cat"]');
+  const catItem = createItem(catDom, cx, cy);
+  catItem.body._isCat = true;
+
+  // 内圈:4 人头 + logo 等中等元素(围绕猫紧贴一圈)
+  const innerItems = [
+    'head-tt', 'head-dd', 'head-zz', 'head-ss',
+    'text-zanting', 'text-subscribed', 'text-mouth', 'headphone', 'logo'
+  ];
+  // 外圈:小道具(再外一圈)
+  const outerItems = [
+    'mic', 'excl', 'leaf-green', 'leaf-orange', 'paw', 'fish',
+    'question', 'arrow', 'planet', 'cloud-pink', 'eye', 'confused'
+  ];
+
+  // 内圈半径(参考猫的尺寸)
+  const innerR = pgW * 0.34;
+  innerItems.forEach((id, i) => {
+    const angle = (i / innerItems.length) * Math.PI * 2 - Math.PI / 2;
+    // 椭圆:水平方向更宽,贴近参考图
+    const x = cx + Math.cos(angle) * innerR * 1.05;
+    const y = cy + Math.sin(angle) * innerR * 0.95;
+    createItem(document.querySelector(`[data-id="${id}"]`), x, y);
+  });
+
+  // 外圈半径
+  const outerR = pgW * 0.46;
+  outerItems.forEach((id, i) => {
+    // 错开角度,避免和内圈对齐
+    const angle = (i / outerItems.length) * Math.PI * 2 - Math.PI / 2 + (Math.PI / outerItems.length);
+    const x = cx + Math.cos(angle) * outerR * 1.0;
+    const y = cy + Math.sin(angle) * outerR * 0.92;
+    createItem(document.querySelector(`[data-id="${id}"]`), x, y);
+  });
+
+  // 入场动画:依次淡入
+  items.forEach((it, i) => {
+    gsap.fromTo(it.dom,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.4, delay: i * CONFIG.ENTER_STAGGER }
+    );
+  });
+}
+
+/* ============================================================
+   5. 初始化流程
+   ============================================================ */
+function init() {
+  measurePlayground();
+  buildWalls();
+  layout();
+}
+
+// 等图片 + 字体都加载好,再初始化
+whenAllImagesLoaded(() => {
+  // 字体加载完再 measure(避免文案区高度未稳定)
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(init);
+  } else {
+    setTimeout(init, 200);
+  }
+});
+
+/* ============================================================
+   6. 渲染循环
+   ============================================================ */
+function render() {
+  items.forEach(it => {
+    const { x, y } = it.body.position;
+    const angle = it.body.angle;
+    it.dom.style.transform =
+      `translate(${x - it.w / 2}px, ${y - it.h / 2}px) rotate(${angle}rad)`;
+  });
+  requestAnimationFrame(render);
+}
+render();
+
+(function tick() {
+  Engine.update(engine, 1000 / 60);
+  requestAnimationFrame(tick);
+})();
+
+/* ============================================================
+   7. 交互一:点击元素 —— 自己跳起来 + 推开周围所有元素
+   ============================================================ */
+playground.addEventListener('pointerdown', (e) => {
+  const dom = e.target.closest('.element');
+  if (!dom) return;
+  const item = items.find(it => it.dom === dom);
+  if (!item) return;
+  e.preventDefault();
+
+  // 自己:给随机方向冲量(跳起来)
+  const angle = Math.random() * Math.PI * 2;
+  Body.applyForce(item.body, item.body.position, {
+    x: Math.cos(angle) * CONFIG.TAP_IMPULSE,
+    y: Math.sin(angle) * CONFIG.TAP_IMPULSE - 0.012,
+  });
+  Body.setAngularVelocity(item.body, (Math.random() - 0.5) * 0.3);
+
+  // 周围其他元素:从被点元素中心向外推开(猫除外,猫有专属逻辑)
+  if (!item.body._isCat) {
+    const tapPos = item.body.position;
+    const radius = pgW * CONFIG.TAP_EXPLOSION_RADIUS;
+    items.forEach(other => {
+      if (other === item) return;
+      const dx = other.body.position.x - tapPos.x;
+      const dy = other.body.position.y - tapPos.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      // 只推近距离的(衰减:距离越远力越小,超过半径几乎为 0)
+      const falloff = Math.max(0, 1 - dist / radius);
+      const f = CONFIG.TAP_EXPLOSION_FORCE * falloff;
+      if (f > 0.001) {
+        Body.applyForce(other.body, other.body.position, {
+          x: (dx / dist) * f,
+          y: (dy / dist) * f,
+        });
+        Body.setAngularVelocity(other.body, (Math.random() - 0.5) * 0.3);
+      }
+    });
+  }
+
+  if (navigator.vibrate) navigator.vibrate(CONFIG.VIBRATE_TAP);
+
+  // 显示对应文案(没文案的元素会被 showMessage 内部跳过)
+  // 真猫和卡通猫共用 'cat' 这一组
+  const messageKey = item.body._isCat ? 'cat' : dom.dataset.id;
+  showMessage(messageKey);
+
+  // 点的是猫:触发形态切换 + 猫专属爆炸推力
+  if (item.body._isCat) switchCat(item);
+});
+
+/* ============================================================
+   8. 切换猫的形态
+   ============================================================ */
+let isCartoon = true;
+
+function switchCat(catItem) {
+  const dom = catItem.dom;
+  const img = dom.querySelector('img');
+
+  // 爆炸推力
+  const catPos = catItem.body.position;
+  items.forEach(other => {
+    if (other === catItem) return;
+    const dx = other.body.position.x - catPos.x;
+    const dy = other.body.position.y - catPos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const f = CONFIG.CAT_EXPLOSION_FORCE * (1 - Math.min(dist / pgW, 1));
+    Body.applyForce(other.body, other.body.position, {
+      x: (dx / dist) * f,
+      y: (dy / dist) * f - 0.005,
+    });
+    Body.setAngularVelocity(other.body, (Math.random() - 0.5) * 0.5);
+  });
+
+  isCartoon = !isCartoon;
+  const newSrc = isCartoon ? 'assets/cat-cartoon.png' : 'assets/cat-real.png';
+
+  const tempImg = new Image();
+  tempImg.onload = () => {
+    img.src = newSrc;
+
+    const oldBody = catItem.body;
+    const targetW = pgW * (isCartoon ? CONFIG.SIZE.cat : CONFIG.SIZE.cat * 0.72);
+    const targetH = targetW * (tempImg.naturalHeight / tempImg.naturalWidth);
+
+    catItem.w = targetW;
+    catItem.h = targetH;
+    dom.style.width = targetW + 'px';
+    dom.style.height = targetH + 'px';
+
+    const newBody = Bodies.rectangle(
+      oldBody.position.x, oldBody.position.y,
+      targetW * 0.78, targetH * 0.82,
+      commonOpts({ chamfer: { radius: targetW * 0.18 } })
+    );
+    newBody._isCat = true;
+    Body.setVelocity(newBody, oldBody.velocity);
+    Body.setAngularVelocity(newBody, oldBody.angularVelocity);
+    Composite.remove(engine.world, oldBody);
+    Composite.add(engine.world, newBody);
+    catItem.body = newBody;
+  };
+  tempImg.src = newSrc;
+
+  if (navigator.vibrate) navigator.vibrate(CONFIG.VIBRATE_CAT_SWITCH);
+}
+
+/* ============================================================
+   9. 交互二:晃动手机(陀螺仪)
+   ============================================================ */
+let lastShakeTime = 0;
+function onMotion(e) {
+  const acc = e.accelerationIncludingGravity;
+  if (!acc) return;
+  const magnitude = Math.sqrt((acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2);
+  const now = Date.now();
+  if (magnitude > CONFIG.SHAKE_THRESHOLD && now - lastShakeTime > 250) {
+    lastShakeTime = now;
+    items.forEach(it => {
+      Body.applyForce(it.body, it.body.position, {
+        x: (Math.random() - 0.5) * CONFIG.SHAKE_FORCE,
+        y: (Math.random() - 0.5) * CONFIG.SHAKE_FORCE,
+      });
+    });
+    if (navigator.vibrate) navigator.vibrate(20);
+  }
+  // 倾斜方向影响重力(更轻微)
+  engine.gravity.x = -(acc.x || 0) * 0.04;
+  engine.gravity.y = CONFIG.GRAVITY_Y + (acc.y || 0) * 0.03;
+}
+
+const motionBtn = document.getElementById('motion-permission');
+if (typeof DeviceMotionEvent !== 'undefined' &&
+    typeof DeviceMotionEvent.requestPermission === 'function') {
+  motionBtn.style.display = 'block';
+  motionBtn.addEventListener('click', async () => {
+    try {
+      const result = await DeviceMotionEvent.requestPermission();
+      if (result === 'granted') {
+        window.addEventListener('devicemotion', onMotion);
+        motionBtn.style.display = 'none';
+      }
+    } catch (err) { console.warn('陀螺仪授权失败', err); }
+  });
+} else {
+  window.addEventListener('devicemotion', onMotion);
+}
+
+/* ============================================================
+   10. 刷新按钮 —— 重置所有元素到初始位置
+   ============================================================ */
+const refreshBtn = document.getElementById('refresh-btn');
+let isResetting = false;
+
+refreshBtn.addEventListener('click', () => {
+  if (isResetting) return;
+  isResetting = true;
+
+  // 给刷新 icon 一个旋转反馈
+  gsap.to(refreshBtn, { rotate: 360, duration: 0.6, ease: 'power2.inOut',
+    onComplete: () => gsap.set(refreshBtn, { rotate: 0 }) });
+
+  // 重置留言框到初始占位状态
+  messageBox.classList.remove('has-content');
+  messageContent.innerHTML = '';
+  // 清空所有元素的"上次显示"记录,这样下次点击是全新随机
+  Object.keys(lastShownIndex).forEach(k => delete lastShownIndex[k]);
+
+  // 直接重置位置,不动猫的形态
+  resetAllPositions();
+});
+
+function resetAllPositions() {
+  items.forEach(it => {
+    // 速度归零
+    Body.setVelocity(it.body, { x: 0, y: 0 });
+    Body.setAngularVelocity(it.body, 0);
+    // 平滑动画到初始位置(用 GSAP 直接控制物理体位置,避免突兀)
+    const startX = it.body.position.x;
+    const startY = it.body.position.y;
+    const startAngle = it.body.angle;
+    const obj = { t: 0 };
+    gsap.to(obj, {
+      t: 1,
+      duration: 0.7,
+      ease: 'power3.inOut',
+      onUpdate: () => {
+        const t = obj.t;
+        Body.setPosition(it.body, {
+          x: startX + (it.initX - startX) * t,
+          y: startY + (it.initY - startY) * t,
+        });
+        Body.setAngle(it.body, startAngle + (0 - startAngle) * t);
+        Body.setVelocity(it.body, { x: 0, y: 0 });
+        Body.setAngularVelocity(it.body, 0);
+      },
+      onComplete: () => { isResetting = false; }
+    });
+  });
+}
+
+/* ============================================================
+   11. 窗口尺寸变化
+   ============================================================ */
+window.addEventListener('resize', () => {
+  measurePlayground();
+  buildWalls();
+});
+</script>
+</body>
+</html>
